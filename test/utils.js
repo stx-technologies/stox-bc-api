@@ -1,8 +1,8 @@
 const axios = require('axios')
-const {PORT} = require('app/config')
+const {port} = require('app/config')
 const HttpError = require('standard-http-error')
 
-const api = `${process.env.API_URL || 'http://localhost'}:${PORT}`
+const api = `${process.env.API_URL || 'http://localhost'}:${port}`
 const apiVersion = process.env.API_VERSION || '/api/v1'
 
 const expectHttpFailure = async (request, status = 400) => {

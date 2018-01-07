@@ -1,22 +1,28 @@
 /* eslint-disable no-underscore-dangle */
 const {getOracleFactoryContract, getOracleContract} = require('./blockchain')
-const {logger} = require('lib/logger')
-const {unlockAccount} = require('./accounts')
 const {
-  InvalidStateError,
-  UnexpectedError,
-  InvalidArgumentError,
-  AlreadyExistsError,
-} = require('lib/exceptions')
+  loggers: {logger},
+  exceptions: {
+    InvalidStateError,
+    UnexpectedError,
+    InvalidArgumentError,
+    AlreadyExistsError,
+  },
+} = require('@welldone-software/node-toolbelt')
 
 const {
-  ORACLE_FACTORY_CONTRACT_ADDRESS,
-  DEFAULT_ORACLE_CONTRACT_ADDRESS,
-  ORACLE_OPERATOR_ACCOUNT_ADDRESS,
-  ORACLE_OPERATOR_ACCOUNT_PASSWORD,
+  oracleFactoryContractAddress,
+  defaultOracleContractAddress,
+  oracleOperatorAccountAddress,
+  oracleOperatorAccountPassword,
 } = require('app/config')
 
-const oraclesFactoryContract = getOracleFactoryContract(ORACLE_FACTORY_CONTRACT_ADDRESS)
+const {
+  unlockAccount,
+  validateAddress,
+} = require('app/utils')
+
+const oraclesFactoryContract = getOracleFactoryContract(oracleFactoryContractAddress)
 
 exports.isPredictionAlreadyRegistered = async (oracleAddress, predictionAddress) =>
   getOracleContract(oracleAddress).methods.predictionsRegistered(predictionAddress).call()
@@ -27,10 +33,11 @@ exports.getPredictionOutcome = async (oracleAddress, predictionAddress) => {
 }
 
 exports.createOracle = async (
-  oracleOwner = ORACLE_OPERATOR_ACCOUNT_ADDRESS,
-  pass = ORACLE_OPERATOR_ACCOUNT_PASSWORD,
+  oracleOwner = oracleOperatorAccountAddress,
+  password = oracleOperatorAccountPassword,
   name) => {
-  unlockAccount(oracleOwner, pass)
+  validateAddress(oracleOwner)
+  unlockAccount(oracleOwner, password)
   const receipt = await oraclesFactoryContract.methods
     .createOracle(name)
     .send({from: oracleOwner})
@@ -52,11 +59,14 @@ exports.getOracleName = async oracleAddress =>
     .call()
 
 const registerPredictionToOracle = async (
-  oracleOwner = ORACLE_OPERATOR_ACCOUNT_ADDRESS,
-  password = ORACLE_OPERATOR_ACCOUNT_PASSWORD,
-  oracleAddress = DEFAULT_ORACLE_CONTRACT_ADDRESS,
+  oracleOwner = oracleOperatorAccountAddress,
+  password = oracleOperatorAccountPassword,
+  oracleAddress = defaultOracleContractAddress,
   predictionAddress
 ) => {
+  validateAddress(oracleOwner)
+  validateAddress(oracleAddress)
+  validateAddress(predictionAddress)
   const oracle = getOracleContract(oracleAddress)
   const alreadyRegistered = await this.isPredictionAlreadyRegistered(oracleAddress, predictionAddress)
   if (alreadyRegistered) {
@@ -77,13 +87,16 @@ const registerPredictionToOracle = async (
 }
 
 exports.setPredictionOutcome = async (
-  oracleOwner = ORACLE_OPERATOR_ACCOUNT_ADDRESS,
-  password = ORACLE_OPERATOR_ACCOUNT_PASSWORD,
-  oracleAddress = DEFAULT_ORACLE_CONTRACT_ADDRESS,
+  oracleOwner = oracleOperatorAccountAddress,
+  password = oracleOperatorAccountPassword,
+  oracleAddress = defaultOracleContractAddress,
   predictionAddress,
   outcomeId,
   forceRegister = true
 ) => {
+  validateAddress(oracleOwner)
+  validateAddress(oracleAddress)
+  validateAddress(predictionAddress)
   if (outcomeId <= 0) {
     throw new InvalidArgumentError(`Invalid outcome id ${outcomeId}`)
   }

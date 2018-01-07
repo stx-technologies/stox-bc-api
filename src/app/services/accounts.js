@@ -1,67 +1,60 @@
 /* eslint-disable no-underscore-dangle */
 const {getStoxTokenContract, web3} = require('./blockchain')
-const {logger} = require('lib/logger')
-
 const {
-  STOX_CONTRACT_ADDRESS,
-  STOX_OWNER_ACCOUNT_ADDRESS,
-  STOX_OWNER_ACCOUNT_PASSWORD,
+  stoxContractAddress,
+  stoxOwnerAccountAddress,
+  stoxOwnerAccountPassword,
 } = require('app/config')
 
-const stoxTokenContract = getStoxTokenContract(STOX_CONTRACT_ADDRESS)
+const stoxTokenContract = getStoxTokenContract(stoxContractAddress)
 
 const {
-  InvalidStateError,
-  UnexpectedError,
-  InvalidArgumentError,
-} = require('lib/exceptions')
+  loggers: {logger},
+  exceptions: {InvalidStateError, UnexpectedError},
+} = require('@welldone-software/node-toolbelt')
 
-const weiToEther = wei => web3.utils.fromWei(wei.toString(), 'ether')
-const etherToWei = ether => web3.utils.toWei(ether.toString(), 'ether')
+const {
+  unlockAccount,
+  etherToWei,
+  weiToEther,
+  validateAddress,
+  validateAmountPositiveOrZero,
+} = require('app/utils')
 
-const unlockAccount = (account, password = '') =>
-  web3.eth.personal.unlockAccount(account, password, '0x0')
-
-const validateAddress = async (request) => {
-  try {
-    return await request()
-  } catch (e) {
-    throw new InvalidArgumentError('Invalid account address', e)
-  }
+const getAccountBalance = async (owner) => {
+  validateAddress(owner)
+  return stoxTokenContract.methods.balanceOf(owner).call()
 }
-
-const getAccountBalance = async owner =>
-  validateAddress(async () => stoxTokenContract.methods.balanceOf(owner).call())
 
 const getAccountBalanceInEther = async accountAddress => ({
   balance: Number(weiToEther(await getAccountBalance(accountAddress))),
 })
 
 const issueTokens = async (issuedAccount, amount) => {
-  if (amount <= 0) {
-    throw new InvalidArgumentError(`Invalid amount ${amount}`)
-  }
+  validateAddress(issuedAccount)
+  validateAmountPositiveOrZero(amount)
 
   const amountWei = etherToWei(amount.toString())
 
-  unlockAccount(STOX_OWNER_ACCOUNT_ADDRESS, STOX_OWNER_ACCOUNT_PASSWORD)
-  const receipt = await validateAddress(async () => stoxTokenContract.methods
-    .issue(issuedAccount, amountWei)
-    .send({from: STOX_OWNER_ACCOUNT_ADDRESS}))
+  if (amountWei > 0) {
+    unlockAccount(stoxOwnerAccountAddress, stoxOwnerAccountPassword)
+    const receipt = await stoxTokenContract.methods
+      .issue(issuedAccount, amountWei)
+      .send({from: stoxOwnerAccountAddress})
 
-  if (receipt.events.Issuance === undefined) {
-    throw new UnexpectedError(receipt)
+    if (receipt.events.Issuance === undefined) {
+      throw new UnexpectedError(receipt)
+    }
+
+    logger.info({receipt})
   }
-
-  logger.info({receipt})
 
   return getAccountBalanceInEther(issuedAccount)
 }
 
 const destroyTokens = async (ownerAccount, amount) => {
-  if (amount <= 0) {
-    throw new InvalidArgumentError(`Invalid amount ${amount}`)
-  }
+  validateAddress(ownerAccount)
+  validateAmountPositiveOrZero(amount)
 
   const {balance: currBalance} = await getAccountBalanceInEther(ownerAccount)
 
@@ -71,21 +64,25 @@ const destroyTokens = async (ownerAccount, amount) => {
   }
 
   const amountWei = etherToWei(amount.toString())
-  unlockAccount(STOX_OWNER_ACCOUNT_ADDRESS, STOX_OWNER_ACCOUNT_PASSWORD)
-  const receipt = await stoxTokenContract.methods
-    .destroy(ownerAccount, amountWei)
-    .send({from: STOX_OWNER_ACCOUNT_ADDRESS})
 
-  if (receipt.events.Destruction === undefined) {
-    throw new UnexpectedError(receipt)
+  if (amountWei > 0) {
+    unlockAccount(stoxOwnerAccountAddress, stoxOwnerAccountPassword)
+    const receipt = await stoxTokenContract.methods
+      .destroy(ownerAccount, amountWei)
+      .send({from: stoxOwnerAccountAddress})
+
+    if (receipt.events.Destruction === undefined) {
+      throw new UnexpectedError(receipt)
+    }
+
+    logger.info({receipt})
   }
-
-  logger.info({receipt})
 
   return getAccountBalanceInEther(ownerAccount)
 }
 
 const createAccount = async (initialAmount = 0) => {
+  validateAmountPositiveOrZero(initialAmount)
   const address = await web3.eth.personal.newAccount('')
   if (initialAmount > 0) {
     await issueTokens(address, initialAmount)
@@ -94,13 +91,16 @@ const createAccount = async (initialAmount = 0) => {
 }
 
 const approveSpenderForAccount = async (accountOwner, spender, amount) => {
+  validateAddress(accountOwner)
+  validateAddress(spender)
+
   const amountWei = etherToWei(amount)
   const currentAllowance = await stoxTokenContract.methods
     .allowance(accountOwner, spender)
     .call()
 
   if (amountWei > 0 && currentAllowance > 0) {
-    throw new InvalidStateError('Cannot approve. Allowance > 0.')
+    throw new InvalidStateError('Cannot approve. Current allowance > 0.')
   }
 
   if (amountWei !== currentAllowance) {

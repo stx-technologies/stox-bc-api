@@ -1,20 +1,22 @@
 /* eslint-disable no-underscore-dangle */
-const {getPredictionFactoryContract, getPoolPredictionContract, web3} = require('./blockchain')
-const {logger} = require('lib/logger')
+const {getPredictionFactoryContract, getPoolPredictionContract} = require('./blockchain')
 const accounts = require('./accounts')
 const oracles = require('./oracles')
 
 const {
-  PREDICTION_FACTORY_CONTRACT_ADDRESS,
-  PREDICTION_OPERATOR_ACCOUNT_ADDRESS,
-  PREDICTION_OPERATOR_ACCOUNT_PASSWORD,
-  DEFAULT_ORACLE_CONTRACT_ADDRESS,
-  DEFAULT_ACCOUNT_PASSWORD,
+  predictionFactoryContractAddress,
+  predictionOperatorAccountAddress,
+  predictionOperatorAccountPassword,
+  defaultOracleContractAddress,
+  defaultAccountPassword,
 } = require('app/config')
 
-const predictionsFactoryContract = getPredictionFactoryContract(PREDICTION_FACTORY_CONTRACT_ADDRESS)
+const predictionsFactoryContract = getPredictionFactoryContract(predictionFactoryContractAddress)
 
-const {InvalidStateError, UnexpectedError, InvalidArgumentError} = require('lib/exceptions')
+const {
+  loggers: {logger},
+  exceptions: {InvalidStateError, UnexpectedError, InvalidArgumentError},
+} = require('@welldone-software/node-toolbelt')
 
 const Status = {
   Initializing: '0',
@@ -24,14 +26,21 @@ const Status = {
   Canceled: '4',
 }
 
-const weiToEther = wei => web3.utils.fromWei(wei.toString(), 'ether')
-const etherToWei = ether => web3.utils.toWei(ether.toString(), 'ether')
-const dateToSeconds = date => Math.floor(new Date(date).getTime() / 1000)
-const secondsToDate = date => new Date(date * 1000)
-
-const unlockAccount = (account, password = '') => web3.eth.personal.unlockAccount(account, password, '0x0')
+const {
+  unlockAccount,
+  etherToWei,
+  weiToEther,
+  validateAddress,
+  validateAmountPositive,
+  validateDate,
+  dateToSeconds,
+  secondsToDate,
+} = require('app/utils')
 
 const publish = async (predictionOwner, password, predictionAddress) => {
+  validateAddress((predictionOwner))
+  validateAddress(predictionAddress)
+
   const poolPredictionContract = getPoolPredictionContract(predictionAddress)
   unlockAccount(predictionOwner, password)
   const receipt = await poolPredictionContract.methods.publish().send({from: predictionOwner})
@@ -44,6 +53,9 @@ const publish = async (predictionOwner, password, predictionAddress) => {
 }
 
 const addOutcome = async (predictionOwner, password, predictionAddress, outcomeName) => {
+  validateAddress((predictionOwner))
+  validateAddress(predictionAddress)
+
   const poolPredictionContract = getPoolPredictionContract(predictionAddress)
   unlockAccount(predictionOwner, password)
   const receipt = await poolPredictionContract.methods.addOutcome(outcomeName).send({from: predictionOwner})
@@ -71,43 +83,39 @@ const getNumberOfOutcomes = async (predictionAddress) => {
   return poolPredictionContract.methods.getOutcomeCount().call()
 }
 
-const isOutcomeValid = async (predictionAddress, outcomeId) => !!await getOutcome(predictionAddress, outcomeId)
+const isOutcomeValid = async (predictionAddress, outcomeId) =>
+  ((typeof outcomeId === 'number') && (outcomeId > 0) && (outcomeId <= await getNumberOfOutcomes(predictionAddress)))
 
 exports.createPoolPrediction = async (
-  predictionOwner = PREDICTION_OPERATOR_ACCOUNT_ADDRESS,
-  password = PREDICTION_OPERATOR_ACCOUNT_PASSWORD,
-  oracleAddress = DEFAULT_ORACLE_CONTRACT_ADDRESS,
-  predictionEndTime,
-  votingEndTime,
+  predictionOwner = predictionOperatorAccountAddress,
+  password = predictionOperatorAccountPassword,
+  oracleAddress = defaultOracleContractAddress,
+  happensAt,
+  votingEndsAt,
   name,
   type,
   outcomeNames
 ) => {
-  const predictionEndTimeSeconds = dateToSeconds(predictionEndTime)
-  const votingEndTimeSeconds = dateToSeconds(votingEndTime)
+  validateAddress((predictionOwner))
+  validateAddress(oracleAddress)
+  validateDate(happensAt)
+  validateDate(votingEndsAt)
 
-  // Check that prediction end time is valid
-  if (!(predictionEndTimeSeconds > 0)) {
-    throw new InvalidArgumentError('Prediction end time should be a number larger than 0')
-  }
-
-  // Check that unit buying end time is valid
-  if (!(votingEndTimeSeconds > 0)) {
-    throw new InvalidArgumentError('Prediction unit buying end time should be a number larger than 0')
-  }
+  const predictionEndTimeSeconds = dateToSeconds(happensAt)
+  const votingEndTimeSeconds = dateToSeconds(votingEndsAt)
 
   // Check that unit buying end time is earlier than the prediction end time
   if (predictionEndTimeSeconds < votingEndTimeSeconds) {
-    throw new InvalidArgumentError('Unit buying end time should be a earlier or equal to the prediction end time')
+    throw new InvalidArgumentError('Voting end time should be a earlier or equal to the prediction end time')
   }
 
   // Check prediction has a valid name
-  if (!name) {
+  if (typeof name !== 'string' || name.trim() === '') {
     throw new InvalidArgumentError('Prediction name shouldn\'t be empty')
   }
 
   if (type !== 'pool') {
-    throw new InvalidArgumentError('Prediction type must be \'pool\'')
+    throw new InvalidArgumentError(`Prediction type must be 'pool', provided ${type}`)
   }
 
   if (outcomeNames.length < 2) {
@@ -151,11 +159,16 @@ const getVotingEndTime = async (predictionAddress) => {
 exports.vote = async (
   predictionAddress,
   accountAddress,
-  accountPassword = DEFAULT_ACCOUNT_PASSWORD,
+  accountPassword = defaultAccountPassword,
   amount,
   outcomeId) => {
-  if (!isOutcomeValid(predictionAddress, outcomeId)) {
-    throw new InvalidArgumentError(`Invalid outcome ${outcomeId}`)
+  validateAddress((predictionAddress))
+  validateAddress(accountAddress)
+  validateAmountPositive(amount)
+
+  const outcomeValid = await isOutcomeValid(predictionAddress, outcomeId)
+  if (!outcomeValid) {
+    throw new InvalidArgumentError(`Invalid outcome id ${outcomeId}`)
   }
 
   const votingEndsAt = await getVotingEndTime(predictionAddress)
@@ -163,7 +176,7 @@ exports.vote = async (
     throw new InvalidStateError(`Voting time has ended at ${votingEndsAt}`)
   }
 
-  const accountBalance = await accounts.getAccountBalanceInEther(accountAddress)
+  const {balance: accountBalance} = await accounts.getAccountBalanceInEther(accountAddress)
   if (accountBalance < amount) {
     throw new InvalidStateError(`Account has insufficient funds. Current balance is ${accountBalance}`)
   }
@@ -171,8 +184,8 @@ exports.vote = async (
   await accounts.approveSpenderForAccount(accountAddress, predictionAddress, 0)
   await accounts.approveSpenderForAccount(accountAddress, predictionAddress, amount)
 
-  unlockAccount(accountAddress, accountPassword)
   const amountWei = etherToWei(amount.toString())
+  unlockAccount(accountAddress, accountPassword)
   const poolPredictionContract = getPoolPredictionContract(predictionAddress)
   const receipt = await poolPredictionContract.methods.buyUnit(amountWei, outcomeId).send({from: accountAddress})
 
@@ -231,8 +244,10 @@ exports.getPrediction = async (predictionAddress) => {
 
 exports.closePrediction = async (
   predictionAddress,
-  predictionOwner = PREDICTION_OPERATOR_ACCOUNT_ADDRESS,
-  predictionOwnerPassword = PREDICTION_OPERATOR_ACCOUNT_PASSWORD) => {
+  predictionOwner = predictionOperatorAccountAddress,
+  predictionOwnerPassword = predictionOperatorAccountPassword) => {
+  validateAddress(predictionAddress)
+
   const poolPredictionContract = getPoolPredictionContract(predictionAddress)
   const oracleAddress = await poolPredictionContract.methods.oracleAddress().call()
 
@@ -271,7 +286,10 @@ exports.closePrediction = async (
 exports.withdrawFunds = async (
   predictionAddress,
   accountAddress,
-  accountPassword = DEFAULT_ACCOUNT_PASSWORD) => {
+  accountPassword = defaultAccountPassword) => {
+  validateAddress(predictionAddress)
+  validateAddress(accountAddress)
+
   const poolPredictionContract = getPoolPredictionContract(predictionAddress)
 
   const predictionStatus = await poolPredictionContract.methods.status().call()
@@ -282,7 +300,6 @@ exports.withdrawFunds = async (
 
   const winningOutcomeId = await poolPredictionContract.methods.winningOutcomeId().call()
   const numberOfUnits = await poolPredictionContract.methods.getUserUnitCount(accountAddress, winningOutcomeId).call()
-  console.log({winningOutcomeId, numberOfUnits})
 
   let amountWithdrawn = 0
 

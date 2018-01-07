@@ -1,6 +1,8 @@
 const {Router} = require('express')
 const bodyParser = require('body-parser')
-const {createApiEndpoint} = require('lib/expressHelpers')
+const {
+  expressHelpers: {createApiEndpoint},
+} = require('@welldone-software/node-toolbelt')
 
 const accounts = require('./services/accounts')
 const oracles = require('./services/oracles')
@@ -46,18 +48,18 @@ router.put(
 
 router.post(
   '/oracles',
-  _(({body: {name, operatorAddress, operatorPassword}}) =>
-    oracles.createOracle(operatorAddress, operatorPassword, name))
+  _(({body: {name, operatorAddress, password}}) =>
+    oracles.createOracle(operatorAddress, password, name))
 )
 
 router.get('/oracles/:oracleAddress', _(({body: {oracleAddress}}) => oracles.getOracle(oracleAddress)))
 
 router.post(
   '/oracles/:oracleAddress/predictions',
-  _(({params: {oracleAddress}, body: {operatorAddress, operatorPassword, predictionAddress, predictionOutcomeId}}) =>
+  _(({params: {oracleAddress}, body: {operatorAddress, password, predictionAddress, predictionOutcomeId}}) =>
     oracles.setPredictionOutcome(
       operatorAddress,
-      operatorPassword,
+      password,
       oracleAddress,
       predictionAddress,
       predictionOutcomeId
@@ -69,7 +71,7 @@ router.post(
 router.post(
   '/predictions',
   _(({body: {predictionOwner,
-    predictionOwnerPassword,
+    password,
     oracleAddress,
     happensAt,
     votingEndsAt,
@@ -78,7 +80,7 @@ router.post(
     outcomeNames}}) =>
     predictions.createPoolPrediction(
       predictionOwner,
-      predictionOwnerPassword,
+      password,
       oracleAddress,
       happensAt,
       votingEndsAt,
@@ -90,8 +92,8 @@ router.post(
 
 router.post(
   '/predictions/:predictionAddress/votes',
-  _(({body: {amount, outcomeId, accountAddress, accountPassword}, params: {predictionAddress}}) =>
-    predictions.vote(predictionAddress, accountAddress, accountPassword, amount, outcomeId))
+  _(({body: {amount, outcomeId, accountAddress, password}, params: {predictionAddress}}) =>
+    predictions.vote(predictionAddress, accountAddress, password, amount, outcomeId))
 )
 
 router.get(
@@ -114,8 +116,8 @@ router.post(
 
 router.post(
   '/predictions/:predictionAddress/withdraw',
-  _(({body: {accountAddress, accountPassword}, params: {predictionAddress}}) =>
-    predictions.withdrawFunds(predictionAddress, accountAddress, accountPassword))
+  _(({body: {accountAddress, password}, params: {predictionAddress}}) =>
+    predictions.withdrawFunds(predictionAddress, accountAddress, password))
 )
 
 module.exports = router

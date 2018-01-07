@@ -1,5 +1,5 @@
 {
-  "name": "stox-bc-api",
+  "name": "stox-blockchain",
   "version": "1.0.0",
   "engines": {
     "node": ">=8.9.2"
@@ -22,33 +22,30 @@
     "testEnvironment": "node"
   },
   "dependencies": {
+    "@welldone-software/node-toolbelt": "^1.2.0",
     "app-module-path": "^2.2.0",
-    "axios": "^0.17.1",
     "body-parser": "^1.18.2",
     "compression": "^1.7.1",
     "cors": "^2.8.4",
     "device-detector": "^1.0.2",
-    "dotenv": "^4.0.0",
     "express": "^4.16.2",
-    "express-pino-logger": "^2.0.0",
     "express-status-monitor": "^1.0.1",
     "lodash": "^4.17.4",
     "moment": "^2.19.1",
     "pino": "^4.8.0",
     "standard-http-error": "^2.0.1",
-    "url-parse": "^1.2.0",
-    "web3": "^1.0.0-beta.26"
+    "web3": "^1.0.0-beta.27"
   },
   "devDependencies": {
-    "@types/jest": "^21.1.9",
+    "@types/jest": "^21.1.10",
     "axios": "^0.17.1",
-    "eslint": "^4.9.0",
+    "eslint": "^4.14.0",
     "eslint-config-airbnb-base": "^12.1.0",
     "eslint-plugin-import": "^2.7.0",
     "jest": "^21.2.1",
-    "nodemon": "^1.12.1",
+    "nodemon": "^1.14.7",
     "prettier": "^1.7.4",
-    "prettier-eslint": "^8.2.1",
-    "prettier-eslint-cli": "^4.4.0"
+    "prettier-eslint": "^8.7.0",
+    "prettier-eslint-cli": "^4.7.0"
   }
 }
