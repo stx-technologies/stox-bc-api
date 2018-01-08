@@ -2,6 +2,7 @@
 require('app-module-path').addPath(__dirname)
 
 const express = require('express')
+const bodyParser = require('body-parser')
 const compression = require('compression')
 const expressStatusMonitor = require('express-status-monitor')
 const {
@@ -14,6 +15,7 @@ const {port} = require('app/config')
 const app = express()
 
 app.use(compression())
+app.use(bodyParser.json())
 app.use(expressLogger())
 app.set('trust proxy', 'loopback')
 app.disable('x-powered-by')
