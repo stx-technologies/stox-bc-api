@@ -26,13 +26,9 @@
     "app-module-path": "^2.2.0",
     "body-parser": "^1.18.2",
     "compression": "^1.7.1",
-    "cors": "^2.8.4",
-    "device-detector": "^1.0.2",
     "express": "^4.16.2",
     "express-status-monitor": "^1.0.1",
     "lodash": "^4.17.4",
-    "moment": "^2.19.1",
-    "pino": "^4.8.0",
     "standard-http-error": "^2.0.1",
     "web3": "^1.0.0-beta.27"
   },
