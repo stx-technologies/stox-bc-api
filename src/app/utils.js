@@ -23,7 +23,7 @@ const validateAmountPositive = (amount) => {
 
   if ((typeof amount !== 'number') && (typeof amount !== 'string')) {
     isValid = false
-  } else if ((typeof amount === 'string') && !(/^\+?[1-9][\d]*$/.test(amount))) {
+  } else if ((typeof amount === 'string') && (Number.isNaN(parseFloat(amount)) || (parseFloat(amount) <= 0))) {
     isValid = false
   } else if ((typeof amount === 'number') && (Number.isNaN(amount) || amount <= 0)) {
     isValid = false
@@ -41,7 +41,7 @@ const validateAmountPositiveOrZero = (amount) => {
 
   if ((typeof amount !== 'number') && (typeof amount !== 'string')) {
     isValid = false
-  } else if ((typeof amount === 'string') && !(/^\+?[0-9][\d]*$/.test(amount))) {
+  } else if ((typeof amount === 'string') && (Number.isNaN(parseFloat(amount)) || (parseFloat(amount) < 0))) {
     isValid = false
   } else if ((typeof amount === 'number') && (Number.isNaN(amount) || amount < 0)) {
     isValid = false
