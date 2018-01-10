@@ -96,7 +96,7 @@ router.post(
 router.get(
   '/predictions/:predictionAddress/:accountAddress/votes',
   _(({params: {predictionAddress, accountAddress}}) =>
-    predictions.getVote(predictionAddress, accountAddress))
+    predictions.getVotes(predictionAddress, accountAddress))
 )
 
 router.get(

@@ -196,7 +196,7 @@ exports.vote = async (
   logger.info({receipt})
 }
 
-exports.getVote = async (predictionAddress, accountAddress) => {
+exports.getVotes = async (predictionAddress, accountAddress) => {
   const poolPredictionContract = getPoolPredictionContract(predictionAddress)
   const outcomeIds =
     Array.from(new Array(parseInt(await getNumberOfOutcomes(predictionAddress), 10)), (val, index) =>
@@ -207,11 +207,12 @@ exports.getVote = async (predictionAddress, accountAddress) => {
   // eslint-disable-next-line
   for (const outcomeId of outcomeIds) {
     const unitsCount = await poolPredictionContract.methods.getUserUnitCount(accountAddress, outcomeId).call()
+    const outcomeName = (await getOutcome(predictionAddress, outcomeId)).name
 
-    if (unitsCount > 0) {
-      const outcomeName = (await getOutcome(predictionAddress, outcomeId)).name
-      const amount = weiToEther(await poolPredictionContract.methods.calculateUserUnitsValue(accountAddress).call())
-      votes.push({outcomeId, outcomeName, amount})
+    for (let i = 0; i < unitsCount; i++) {
+      const unitId = await poolPredictionContract.methods.ownerUnits(accountAddress, outcomeId, i).call()
+      const unit = await poolPredictionContract.methods.units(unitId - 1).call()
+      votes.push({outcomeId, outcomeName, amount: weiToEther(unit[2])})
     }
   }
 
